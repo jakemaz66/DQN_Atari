@@ -5,6 +5,7 @@ from torch import nn
 import random
 import torch.optim as optim
 from itertools import count
+import math
 
 #Setting up the gym environment
 num_episodes = 0
@@ -15,38 +16,38 @@ observation_space = env.observation_space._shape[0]
 action_space = env.action_space.n
 
 #Defining Q function approximators with 64 hidden neurons
-policy_network = function_approximators.FunctionApproximator(observation_space, 64, action_space)
-target_network = function_approximators.FunctionApproximator(observation_space, 64, action_space)
+policy_network = function_approximators.FunctionApproximator(observation_space, 128, action_space)
+target_network = function_approximators.FunctionApproximator(observation_space, 128, action_space)
 #Setting the parameters of the target network equal to the policy network
 target_network.load_state_dict(policy_network.state_dict())
 
-optm = optim.Adam(policy_network.parameters(), lr=config.LR)
+optm = optim.AdamW(policy_network.parameters(), lr=config.LR, amsgrad=True)
 replay_memory = memory_replay.MemoryReplay(max_len=10_000)
+
+steps_done = 0
 
 
 def take_action(observation):
     """This function takes one action (E-Greedy selection of Q values)"""
-    epsilon = config.EPSILON
+    global steps_done
 
     #Sampling a random float between 0 and 1
-    explore = round(random.uniform(0,1), 2)
+    explore = random.random()
 
-    #Because we are not updating parameters
-    with torch.no_grad():
+    eps_threshold = config.EPS_END + (config.EPS_START - config.EPS_END) * \
+        math.exp(-1. * steps_done / config.EPS_DECAY)
+    steps_done += 1
 
-        if explore > epsilon:
-
+    if explore > eps_threshold:
+        #Because we are not updating parameters
+        with torch.no_grad():
             #Take the action with the highest Q value (max(1)) and return a tensor with it
             #max() gives max value for all actions along with an index, view turns it into 
             #multi-dimensional tensor
-            max_q = policy_network(observation).max(1).indices.view(-1, 1)
-            return max_q
-        
-        else:
-            #Randomly sample an action (exploring)
-            random_q = env.action_space.sample()
-            return torch.tensor([[random_q]])
-
+            return policy_network(state).max(1).indices.view(1, 1)
+    else:
+        #Randomly sample an action (exploring)
+        return torch.tensor([[env.action_space.sample()]], dtype=torch.long)
 
 
 def update_params():
@@ -62,7 +63,8 @@ def update_params():
     #Gathering all the states, actions, and rewards from sample
     batch = memory_replay.EnvStep(*zip(*samples))
 
-    non_final_mask = torch.tensor(tuple(map(lambda s: s is not None, batch.next_state)))
+    non_final_mask =  torch.tensor(tuple(map(lambda s: s is not None,
+                                          batch.next_state)), dtype=torch.bool)
     #get all the states for time step t + 1
     non_final_states = torch.cat([s for s in batch.next_state
                                                 if s is not None])
@@ -98,8 +100,6 @@ def update_params():
     torch.nn.utils.clip_grad_value_(policy_network.parameters(), 100)
     optm.step()
 
-    return loss_ret
-
 
 
 #Main training loop
@@ -107,17 +107,23 @@ if __name__ == '__main__':
 
     for i in range(config.NUMEPISODES):
         state, info = env.reset()
-        state = torch.tensor(state).unsqueeze(0)
+        state = torch.tensor(state, dtype=torch.float32).unsqueeze(0)
+        counter = 0
 
         #For as many time steps as it takes until the episode terminates
         for t in count():
             action = take_action(state)
+            counter += 1
 
             observation, reward, terminated, truncated, info = env.step(action.item())
             reward = torch.tensor([reward])
             done = terminated or truncated
-
-            next_state = torch.tensor(observation, dtype=torch.float32).unsqueeze(0)
+            
+            #If episode is about to terminate, do not append a next state
+            if terminated:
+                next_state = None
+            else:
+                next_state = torch.tensor(observation, dtype=torch.float32).unsqueeze(0)
 
             replay_memory.add_episode(state, action, next_state, reward)
 
@@ -125,19 +131,19 @@ if __name__ == '__main__':
             state = next_state
 
             #update the policy network parameters
-            loss = update_params()
+            update_params()
 
             #update the parameters of the target network
             target_sd = target_network.state_dict()
             policy_sd = policy_network.state_dict()
 
             for key in policy_sd:
-                target_sd[key] = (policy_sd[key] * config.SOFTUPDATE) + target_sd[key] * (1-config.SOFTUPDATE)
+                target_sd[key] = (policy_sd[key] * config.SOFTUPDATE) + (target_sd[key] * (1-config.SOFTUPDATE))
 
             target_network.load_state_dict(target_sd)
 
             #If episode is over, break out of loop and iterate episode
             if done:
                 num_episodes += 1
-                print(f'Reward at episode {num_episodes} is {loss}')
+                print(f'Duration of actions at {num_episodes} is {steps_done/num_episodes}')
                 break
