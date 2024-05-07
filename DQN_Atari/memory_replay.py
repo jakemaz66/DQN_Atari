@@ -5,7 +5,7 @@ import random
 """EnvStep is a transition from one state to the next. It remembers the current state of agent,
    the action selected, the observation from the environment, and the reward
 """
-EnvStep = namedtuple('EnvStep', ['state', 'action', 'next_state', 'reward'])
+EnvStep = namedtuple('EnvStep', ('state', 'action', 'next_state', 'reward'))
 
 
 class MemoryReplay:
@@ -21,4 +21,7 @@ class MemoryReplay:
     def add_episode(self, *args):
         """This function appends an episode to our memory"""
         self.memory.append(EnvStep(*args))
+
+    def length(self):
+        return len(self.memory)
 

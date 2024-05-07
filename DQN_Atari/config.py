@@ -17,4 +17,4 @@ EXPLOREDECAY = 0.9
 SOFTUPDATE = 0.05
 
 #number of episodes to train for
-NUMEPISODES = 50
+NUMEPISODES = 500

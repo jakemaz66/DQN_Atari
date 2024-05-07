@@ -14,12 +14,15 @@ class FunctionApproximator(nn.Module):
             hidden_size (_type_): the number of hidden layers in the network
             action_size (_type_): the number of possible actions
         """
+        #Calling parent constructor
+        super(FunctionApproximator, self).__init__()
 
-        self.linear1 = nn.Linear(obervation_size, hidden_size)
-        self.linear2 = nn.Linear(hidden_size, action_size)
+        self.layer1 = nn.Linear(obervation_size, hidden_size)
+        self.layer2 = nn.Linear(hidden_size, hidden_size)
+        self.layer3 = nn.Linear(hidden_size, action_size)
 
     def forward(self, observation):
-        observation = F.relu(self.linear1(observation))
-        observation = F.relu(self.linear2(observation))
+        observation = F.relu(self.layer1(observation))
+        observation = F.relu(self.layer2(observation))
+        return self.layer3(observation)
 
-        return observation
