@@ -93,6 +93,9 @@ def update_params():
     loss = loss_fn(q_value_function, next_q_value_function.unsqueeze(1))
     loss_ret = (loss.detach()*weights) + 1e-5
 
+    #clipping the loss to between (0,1) for stability
+    loss = torch.clip(loss, min=-1, max=1)
+
     optm.zero_grad()
     loss.backward()
 
