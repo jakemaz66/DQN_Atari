@@ -22,7 +22,7 @@ target_network = function_approximators.FunctionApproximator(observation_space, 
 target_network.load_state_dict(policy_network.state_dict())
 
 optm = optim.AdamW(policy_network.parameters(), lr=config.LR, amsgrad=True)
-replay_memory = memory_replay.MemoryReplay(max_len=10_000)
+replay_memory = memory_replay.PrioritizedMemoryReplay(max_len=10_000)
 
 steps_done = 0
 
@@ -58,7 +58,7 @@ def update_params():
         return
     
     #Sampling from the replay memory, samples is a batch of named tuples
-    samples = replay_memory.sample(config.BATCHSIZE)
+    samples, indices, weights = replay_memory.sample(config.BATCHSIZE)
 
     #Gathering all the states, actions, and rewards from sample
     batch = memory_replay.EnvStep(*zip(*samples))
@@ -91,10 +91,13 @@ def update_params():
     loss_fn = nn.SmoothL1Loss()
     #The loss is the initial q value estimate subtracted by the estimate after one time step (after we gain more information)
     loss = loss_fn(q_value_function, next_q_value_function.unsqueeze(1))
-    loss_ret = loss
+    loss_ret = (loss.detach()*weights) + 1e-5
 
     optm.zero_grad()
     loss.backward()
+
+    #Updating transition priorities
+    replay_memory.update_priorities(indices, loss_ret)
 
     #We clip the gradient in order to protect against exploding gradients
     torch.nn.utils.clip_grad_value_(policy_network.parameters(), 100)
