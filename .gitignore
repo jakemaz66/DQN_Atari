@@ -131,3 +131,5 @@ dmypy.json
 # Custom
 data/
 .DS_Store
+
+A2C_Atari/

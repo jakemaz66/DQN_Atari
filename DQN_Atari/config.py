@@ -10,12 +10,15 @@ LR = 1e-4
 GAMMA = 0.99
 
 #decay rate for e-greedy exploring
-EPS_START = 0.9
-EPS_END = 0.05
-EPS_DECAY = 1000
+EPS_START = 0.05
+EPS_END = 0.0005
+EPS_DECAY = 0.00005
 
 #soft update paramter for the target network
 SOFTUPDATE = 0.005
 
 #number of episodes to train for
 NUMEPISODES = 5000
+
+#number of frames for Atari
+NUMFRAMES = 100_000
