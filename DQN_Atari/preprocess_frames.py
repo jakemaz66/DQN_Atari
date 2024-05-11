@@ -13,8 +13,6 @@ def preprocess_frames(frame):
 
     frame = cv2.resize(frame, (84, 84), interpolation=cv2.INTER_NEAREST)
 
-    frame = np.array(frame, dtype=np.uint8)
-
     return torch.tensor(frame)
 
 
@@ -22,5 +20,7 @@ def stack_frames(state,frames):
     """This function stacks the four most recent frames"""
 
     frames.append(state)
-
     return frames
+
+if __name__ == '__main__':
+    preprocess_frames(np.array([[[3]]]))

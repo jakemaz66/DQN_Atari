@@ -1,12 +1,9 @@
 import torch
 import torch.nn as nn
 import torch.autograd as autograd 
-import torch.optim as optim
 import torch.nn.functional as F
 import random
-import numpy as np
-import math, random
-import gym
+import random
 
 class FunctionApproximator(nn.Module):
 
@@ -33,6 +30,7 @@ class FunctionApproximator(nn.Module):
     
 
 class AtariFunctionApproximator(nn.Module):
+    """This is a CNN to play Atari Games"""
 
     def __init__(self, frame, action_size):
         #Calling parent constructor
@@ -64,7 +62,6 @@ class AtariFunctionApproximator(nn.Module):
         x = self.feed_forward(x)
         return x
 
-
     def feature_size(self):
         #Self.frame is a tuple of the frame size (4, 84, 84)
         return self.features(autograd.Variable(torch.zeros(1,*self.frame))).view(1, -1).size(1)
@@ -72,12 +69,11 @@ class AtariFunctionApproximator(nn.Module):
     def act(self, state, epsilon, env):
         #Epsilon greedy exploration
         if random.random() > epsilon:
-            state  = autograd.Variable(torch.FloatTensor(np.float32(state)).unsqueeze(0), volatile=True)
-
-            q_value = self.forward(state)
-
+            q_value = self.forward(state.unsqueeze(0).to(torch.float32))
+            #Act according to highest q value, getting the index of the action
             action  = q_value.max(1)[1].data[0]
         else:
+            #Take random action
             action = random.randrange(env.action_space.n)
 
         return torch.tensor([action])
