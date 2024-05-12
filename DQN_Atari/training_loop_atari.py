@@ -105,7 +105,7 @@ if __name__ == '__main__':
 
     """
 
-    epsilon = config.EPS_START
+    epsilon = 1
 
     #State is an RGB image
     state, _ = env.reset()
@@ -132,9 +132,11 @@ if __name__ == '__main__':
 
             frames_tuple = tuple(tensor for tensor in frames_queue)
             stacked_frames = torch.stack(frames_tuple).reshape((4,84,84))
+            state = stacked_frames
              
             with torch.no_grad():
-                action = policy_network.act(state, epsilon, env)
+                new_epslion, action = policy_network.act(state, epsilon, env)
+                epsilon = new_epslion
 
             observation, reward, terminated, truncated, info = env.step(action.item())
 
@@ -166,10 +168,7 @@ if __name__ == '__main__':
                 target_sd = target_network.state_dict()
                 policy_sd = policy_network.state_dict()
 
-                for key in policy_sd:
-                    target_sd[key] = (policy_sd[key] * config.SOFTUPDATE) + (target_sd[key] * (1-config.SOFTUPDATE))
-
-                target_network.load_state_dict(target_sd)
+                target_network.load_state_dict(policy_sd)
 
             #Saving model every 100,000 frames
             if i % 100_000 == 0:
@@ -181,7 +180,6 @@ if __name__ == '__main__':
             #If episode is over, break out of loop and iterate episode
             if done:
                 #Decaying epsilon for lessened exploration
-                epsilon = epsilon - (epsilon * config.EPS_DECAY)
 
                 state, info = env.reset()
                 state = preprocess_frames(state)

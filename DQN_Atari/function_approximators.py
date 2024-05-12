@@ -4,6 +4,7 @@ import torch.autograd as autograd
 import torch.nn.functional as F
 import random
 import random
+import config
 
 class FunctionApproximator(nn.Module):
 
@@ -76,7 +77,10 @@ class AtariFunctionApproximator(nn.Module):
             #Take random action
             action = random.randrange(env.action_space.n)
 
-        return torch.tensor([action])
+        if epsilon > config.EPSILON_MIN:
+            epsilon -= config.EPSILON_DECAY
+
+        return epsilon, torch.tensor([action])
     
 
 

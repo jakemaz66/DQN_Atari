@@ -1,18 +1,17 @@
 """This contains all the hyperparameters for the training"""
 
 #number of episodes to sample from memory
-BATCHSIZE = 128
+BATCHSIZE = 32
 
 #learning rate for optimizer
 LR = 1e-4
 
 #decay rate for rewards
-GAMMA = 0.99
+GAMMA = 0.95
 
 #decay rate for e-greedy exploring
-EPS_START = 0.05
-EPS_END = 0.0005
-EPS_DECAY = 0.00005
+EPSILON_DECAY = .9/100000
+EPSILON_MIN = .05
 
 #soft update paramter for the target network
 SOFTUPDATE = 0.005
