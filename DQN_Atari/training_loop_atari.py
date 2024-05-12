@@ -192,7 +192,8 @@ if __name__ == '__main__':
                 next_state = None
 
                 print(f'Episode {n_episode} is complete')
-                print(f'Reward at this episode: {episode_reward/n_episode}')
+                print(f'Reward at this episode: {episode_reward}')
+                episode_reward = 0
 
                 if n_episode % 10_000 == 0:
                     last_100_avg.append(sum(score)/len(score))
