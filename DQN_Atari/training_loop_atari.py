@@ -19,7 +19,7 @@ def update_params():
     
     #Sampling from the replay memory, samples is a batch of named tuples
     #Weights are from prioritized replay importance sampling
-    samples = replay_memory.sample(config.BATCHSIZE)
+    samples, indices, weights = replay_memory.sample(config.BATCHSIZE)
 
     #Gathering all the states, actions, and rewards from sample
     batch = memory_replay.EnvStep(*zip(*samples))
@@ -53,10 +53,13 @@ def update_params():
     #q_value_function is the Q values of the actions we did take, next_q_val is the immediate reward + the max Q val of the next state
     criterion = nn.SmoothL1Loss()
     loss = criterion(q_value_function.squeeze(0), next_q_value_function)
+    loss_ret = loss + 1e-5
 
     # Optimize the model
     optimizer.zero_grad()
     loss.backward()
+
+    replay_memory.update_priorities(indices, loss_ret.numpy())
     # In-place gradient clipping
     torch.nn.utils.clip_grad_value_(policy_network.parameters(), 100)
     optimizer.step()
@@ -91,7 +94,7 @@ if __name__ == '__main__':
     optimizer = optim.AdamW(policy_network.parameters(), lr=config.LR, amsgrad=True)
 
     #Initializing optimizer and prioritized replay memory
-    replay_memory = memory_replay.ReplayMemory(capacity=100_000)
+    replay_memory = memory_replay.PrioritizedMemoryReplay(capacity=100_000)
     epsilon = 1
 
     #State is an image
