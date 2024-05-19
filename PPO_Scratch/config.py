@@ -4,7 +4,7 @@
 BATCHSIZE = 5
 
 #learning rate for optimizer
-LR = 0.00025
+LR = 0.0001
 
 #decay rate for rewards
 GAMMA = 0.99
@@ -21,3 +21,5 @@ NUMEPISODES = 500
 TRAJLENGTH = 20
 
 OPTM_EPOCHS = 3
+
+ENTROPY_TERM = 0.01

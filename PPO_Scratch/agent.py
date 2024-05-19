@@ -1,7 +1,6 @@
 import actor as a, critic as c, config as fig
 from torch.optim import Adam
 import torch
-from torch.distributions import Categorical
 import numpy as np
 from stable_baselines3 import PPO
 
@@ -29,6 +28,7 @@ class Agent:
         
 
     def act(self, observation):
+        """Take an action in the environement by sampling from policy"""
         observation = torch.tensor(observation)
 
         policy = self.actor(observation)
@@ -51,9 +51,15 @@ class Agent:
         self.actions.clear()
         self.rewards.clear()
         self.state_vals.clear()
+        self.log_probs.clear()
+        self.states.clear()
+        self.dones.clear()
+
 
     def sample_memory(self):
+        """Collect mini-batches of samples, need to be randomly shuffled to avoid temporal correlation"""
         n_states = len(self.states)
+        #Skip by batch size
         batch_start = np.arange(0, n_states, self.batch_size)
         indices = np.arange(n_states, dtype=np.int64)
         np.random.shuffle(indices)
@@ -69,38 +75,46 @@ class Agent:
 
     def learn(self):
         #Sampling minibatches from memory of trajectory
-        states_samples, action_samples, log_prob_samples, state_val_samples, reward_samples, dones_samples, batch = self.sample_memory()
+        states_samples, action_samples, log_prob_samples, state_val_samples, reward_samples, dones_samples, batches = self.sample_memory()
         
         #Advantage Calculation for each step t -> A1, ..., AT
         advantage = np.zeros(len(reward_samples), dtype=np.float32)
 
         for t in range(len(reward_samples)-1):
             discount = 1
+            #Tracking advantage value for each time step in trajectory
             a_t = 0
             for k in range(t, len(reward_samples)-1):
-                #Rewards plus the state at the next time-step k+1
+                #Discounted rewards plus the state at the next time-step k+1
+                # r(t + 1) + V(s'), value of a terminal state is always 0
                 a_t += discount*(reward_samples[k] + fig.GAMMA*state_val_samples[k+1]*\
                         (1-int(dones_samples[k])) - state_val_samples[k])
+                #Incrementing discount 
                 discount *= fig.GAMMA*fig.GAE_LAMBDA
             advantage[t] = a_t
 
-        rewards = torch.tensor(reward_samples)
+        reward_samples = torch.tensor(reward_samples)
         advantage = torch.tensor(advantage)
 
         #Optimize surrogate L wrt θ, with K epochs and minibatch size M ≤ NT
         #Use mini-batches to repeatedly optimize
-        for batch in batch:
-            states_samples = torch.tensor(states_samples[batch]).squeeze(1)
-            action_samples = torch.tensor(action_samples[batch])
-            log_prob_samples = torch.tensor(log_prob_samples[batch])
+        for batch in batches:
+            states_arr = torch.tensor(states_samples[batch]).squeeze(1)
+            action_arr = torch.tensor(action_samples[batch])
 
             #The old log prob of actions we took during the trajectory
-            old_probs = log_prob_samples
-            #Retrieving new policy from sampled states
-            new_policy = self.actor(states_samples)
-            new_critic_value = self.critic(states_samples)
-            new_probs = new_policy.log_prob(action_samples)
+            old_probs = torch.tensor(log_prob_samples[batch])
 
+            #Retrieving new policy from sampled states
+            new_policy = self.actor(states_arr)
+
+            ent = new_policy.entropy().mean()
+
+            #New state values
+            new_critic_value = self.critic(states_arr)
+            new_probs = new_policy.log_prob(action_arr)
+
+            #Ratio of new policy to old
             ratio = new_probs.exp() / old_probs.exp()
             weighted_ratio = ratio * advantage[batch]
 
@@ -109,11 +123,12 @@ class Agent:
             returns = advantage[batch] + state_val_samples[batch]
             actor_loss = -torch.min(weighted_ratio, weighted_clipped_probs).mean()
 
-            critic_loss = (returns + state_val_samples[batch] - new_critic_value).pow(2).mean()
+            critic_loss = (returns - new_critic_value).pow(2).mean()
 
-            total_loss = actor_loss + 0.5*critic_loss
+            #total_loss = actor_loss - (ent * fig.ENTROPY_TERM) + 0.5*critic_loss
+            total_loss = actor_loss  + 0.5*critic_loss
 
-
+            #Perform updates
             self.critic_optimizer.zero_grad()
             self.actor_optimizer.zero_grad()
             total_loss.backward()

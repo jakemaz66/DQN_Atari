@@ -3,10 +3,14 @@ import config as fig, agent as a
 
 if __name__ == '__main__':
     env = gym.make("CartPole-v0")
+    seed = 42  # You can use any integer you like
+    env.action_space.seed(42)
+
     obs_space = env.observation_space.shape[0]
     act_space = env.action_space.n
 
     agent = a.Agent(obs_space, act_space, fig.BATCHSIZE)
+    state, _ = env.reset(seed=42)
 
     for episode in range(fig.NUMEPISODES):
         state, _ = env.reset()
@@ -15,6 +19,8 @@ if __name__ == '__main__':
 
         while not done:
             #Run policy πθold in environment for T timesteps
+
+            #log_prob stored for πθold calculation, state_value stored for baseline subtraction in advantage
             action, log_prob, state_value = agent.act(state)
 
             steps += 1
