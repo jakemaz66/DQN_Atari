@@ -8,8 +8,8 @@ from stable_baselines3 import PPO
 class Agent:
 
     def __init__(self, obervation_size, action_size, batch_size):
-        self.actor = a.Actor(obervation_size, action_size)
-        self.critic = c.Critic(obervation_size, action_size)
+        self.actor = a.PongActor(obervation_size, action_size)
+        self.critic = c.PongCritic(obervation_size, action_size)
 
         self.actor_optimizer = Adam(params=self.actor.parameters(), lr=fig.LR)
         self.critic_optimizer = Adam(params=self.critic.parameters(), lr=fig.LR)
