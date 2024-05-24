@@ -3,13 +3,14 @@ from torch.optim import Adam
 import torch
 import numpy as np
 from stable_baselines3 import PPO
+from torch import nn
 
 
 class Agent:
 
     def __init__(self, obervation_size, action_size, batch_size):
-        self.actor = a.PongActor(obervation_size, action_size)
-        self.critic = c.PongCritic(obervation_size, action_size)
+        self.actor = a.Actor(obervation_size, action_size)
+        self.critic = c.Critic(obervation_size, action_size)
 
         self.actor_optimizer = Adam(params=self.actor.parameters(), lr=fig.LR)
         self.critic_optimizer = Adam(params=self.critic.parameters(), lr=fig.LR)
@@ -132,6 +133,8 @@ class Agent:
             self.critic_optimizer.zero_grad()
             self.actor_optimizer.zero_grad()
             total_loss.backward()
+            nn.utils.clip_grad_norm_(self.critic.parameters(), 0.5)
+            nn.utils.clip_grad_norm_(self.actor.parameters(), 0.5)
             self.critic_optimizer.step()
             self.actor_optimizer.step()
 

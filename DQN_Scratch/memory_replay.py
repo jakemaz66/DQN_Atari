@@ -1,11 +1,27 @@
 from collections import deque, namedtuple
 import numpy as np
+import random 
 
 
 """EnvStep is a transition from one state to the next. It remembers the current state of agent,
    the action selected, the observation from the environment, and the reward
 """
 EnvStep = namedtuple('EnvStep', ('state', 'action', 'next_state', 'reward'))
+
+class ReplayMemory(object):
+
+    def __init__(self, capacity):
+        self.memory = deque([], maxlen=capacity)
+
+    def push(self, *args):
+        """Save a transition"""
+        self.memory.append(EnvStep(*args))
+
+    def sample(self, batch_size):
+        return random.sample(self.memory, batch_size)
+
+    def __len__(self):
+        return len(self.memory)
 
 
 class PrioritizedMemoryReplay:
@@ -21,7 +37,10 @@ class PrioritizedMemoryReplay:
 
     def sample(self, batch_size, beta=0.4):
         """We need to sample episodes randomly from the memory buffer"""
-        prios = self.priority[:self.pos]
+        if self.priority[-1] != 0:
+            prios = self.priority
+        else:
+            prios = self.priority[:self.pos]
         #Probability of sampling a transition is the priority raise to alpha / sum of all priorities raised to alpha
         probs  = prios ** self.prob_alpha
 

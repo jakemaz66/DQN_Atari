@@ -6,6 +6,7 @@ import random
 import torch.optim as optim
 from itertools import count
 import math
+import config as c
 
 #Setting up the gym environment
 num_episodes = 0
@@ -34,17 +35,15 @@ def take_action(observation):
     #Sampling a random float between 0 and 1
     explore = random.random()
 
-    eps_threshold = config.EPS_END + (config.EPS_START - config.EPS_END) * \
-        math.exp(-1. * steps_done / config.EPS_DECAY)
     steps_done += 1
 
-    if explore > eps_threshold:
+    if explore > 0.05:
         #Because we are not updating parameters
         with torch.no_grad():
             #Take the action with the highest Q value (max(1)) and return a tensor with it
             #max() gives max value for all actions along with an index, view turns it into 
             #multi-dimensional tensor
-            return policy_network(state).max(1).indices.view(1, 1)
+            return policy_network(observation).max(1).indices.view(1, 1)
     else:
         #Randomly sample an action (exploring)
         return torch.tensor([[env.action_space.sample()]], dtype=torch.long)
@@ -81,35 +80,34 @@ def update_params():
     #Getting the state value function at the next time step
     next_step_value_function = torch.zeros(config.BATCHSIZE)
     with torch.no_grad():
-        #Set all future values that are not final to
+        #Set all future values that are not final to, if it's a terminal state, it has a valye of 0
         next_step_value_function[non_final_mask] = target_network(non_final_states).max(1).values
 
     #Now, compute the state-action Q function (with discount factor)
     next_q_value_function = (next_step_value_function * config.GAMMA) + reward_batch
 
     #Computing the loss function
-    loss_fn = nn.SmoothL1Loss()
+    loss_fn = torch.nn.MSELoss()
     #The loss is the initial q value estimate subtracted by the estimate after one time step (after we gain more information)
     loss = loss_fn(q_value_function, next_q_value_function.unsqueeze(1))
     loss_ret = (loss.detach()*weights) + 1e-5
 
-    #clipping the loss to between (0,1) for stability
-    loss = torch.clip(loss, min=-1, max=1)
-
     optm.zero_grad()
     loss.backward()
 
-    #Updating transition priorities
     replay_memory.update_priorities(indices, loss_ret)
+
+    #Updating transition priorities
+    #replay_memory.update_priorities(indices, loss_ret)
 
     #We clip the gradient in order to protect against exploding gradients
     torch.nn.utils.clip_grad_value_(policy_network.parameters(), 100)
     optm.step()
 
 
-
 #Main training loop
 if __name__ == '__main__':
+    steps_done = 0
 
     for i in range(config.NUMEPISODES):
         state, info = env.reset()
@@ -139,17 +137,16 @@ if __name__ == '__main__':
             #update the policy network parameters
             update_params()
 
-            #update the parameters of the target network
-            target_sd = target_network.state_dict()
-            policy_sd = policy_network.state_dict()
+            target_net_state_dict = target_network.state_dict()
+            policy_net_state_dict = policy_network.state_dict()
 
-            for key in policy_sd:
-                target_sd[key] = (policy_sd[key] * config.SOFTUPDATE) + (target_sd[key] * (1-config.SOFTUPDATE))
+            for key in policy_net_state_dict:
+                target_net_state_dict[key] = policy_net_state_dict[key]*c.TAU + target_net_state_dict[key]*(1-c.TAU)
 
-            target_network.load_state_dict(target_sd)
+            target_network.load_state_dict(target_net_state_dict)
 
             #If episode is over, break out of loop and iterate episode
             if done:
                 num_episodes += 1
-                print(f'Duration of actions at {num_episodes} is {steps_done/num_episodes}')
+                print(f'Duration of actions at {num_episodes} is {counter}')
                 break
